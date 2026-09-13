@@ -1,0 +1,11 @@
+{
+  "recommendations": [
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "charliermarsh.ruff",
+    "esbenp.prettier-vscode",
+    "oxc.oxc-vscode",
+    "qwtel.sqlite-viewer",
+    "bierner.markdown-mermaid"
+  ]
+}

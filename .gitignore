@@ -1,0 +1,33 @@
+# --- Python (etl/) ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# --- Node / frontend (web/) ---
+node_modules/
+dist/
+web/.vite/
+
+# --- Data ---
+etl/data/raw/*
+!etl/data/raw/.gitkeep
+etl/data/processed/*
+!etl/data/processed/.gitkeep
+*.sqlite
+*.sqlite3
+web/public/data/*
+!web/public/data/.gitkeep
+
+# --- Env / secrets ---
+.env
+.env.*
+!.env.example
+
+# --- OS / editor junk ---
+.DS_Store
+Thumbs.db
+*.log

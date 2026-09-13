@@ -1,0 +1,7 @@
+# Core
+pandas>=2.2
+requests>=2.32
+
+# Dev tooling
+pytest>=8.0
+ruff>=0.6
