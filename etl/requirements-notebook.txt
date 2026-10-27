@@ -1,0 +1,6 @@
+# Extra deps for notebooks/exploratory_analysis.ipynb (not needed by the pipeline or CI).
+-r requirements.txt
+matplotlib>=3.9
+nbformat>=5.10
+nbclient>=0.10
+ipykernel>=6.29
