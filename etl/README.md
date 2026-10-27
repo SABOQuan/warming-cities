@@ -12,7 +12,10 @@ Modules to be added phase by phase (see `../ROADMAP.md`):
   GHCN-Monthly into `data/raw/ghcn/`.
 - `download_sea_level.py` — deferred to v2. Local sea-level change mixes land subsidence and
   global rise, which is out of scope for this version.
-- `clean.py` — Phase 2. Parse, validate, and normalize each raw dataset into a common annual
+- `clean.py` — Phase 2 (`python clean.py`). Season-adjusted annual temperature and PM2.5 per
+  city in `data/processed/`, plus `quality_report.json` (coverage, baseline, dropped months).
+  Drops PM2.5 months with < 75% coverage or error-code spikes. Methodology is in its docstring.
+  Originally planned as: parse, validate, and normalize each raw dataset into a common annual
   granularity per city.
 - `notebooks/exploratory_analysis.ipynb` — Phase 2.5. Trend regression, rolling averages,
   temperature-vs-air-quality correlation analysis (with the causation caveat documented in
