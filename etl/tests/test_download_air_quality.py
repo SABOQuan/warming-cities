@@ -1,8 +1,8 @@
-"""Unit tests for the OpenAQ download client (download.py).
+"""Unit tests for the OpenAQ download client (download_air_quality.py).
 
-These don't hit the real API — requests.Session.get is monkeypatched so the tests run offline
-and in CI without needing a real OPENAQ_API_KEY. time.sleep is also monkeypatched to a no-op
-(autouse fixture below) so retry-backoff tests don't actually wait tens of seconds.
+These don't hit the real API — requests.Session.get is monkeypatched so the tests run offline and
+in CI without an OPENAQ_API_KEY. The rate limiter gets a fake clock whose sleep() just advances
+time, so the tests both run instantly and can assert exactly how long the limiter would wait.
 """
 
 import json
@@ -14,192 +14,279 @@ import requests
 import download_air_quality as download
 
 
-@pytest.fixture(autouse=True)
-def no_sleep(monkeypatch):
-    monkeypatch.setattr(download.time, "sleep", lambda _seconds: None)
+class FakeClock:
+    def __init__(self, start: float = 1_000_000.0) -> None:
+        self.now = start
+        self.slept: list[float] = []
+
+    def time(self) -> float:
+        return self.now
+
+    def sleep(self, seconds: float) -> None:
+        self.slept.append(seconds)
+        self.now += seconds
 
 
-def _mock_response(json_body: dict, status_ok: bool = True) -> MagicMock:
+@pytest.fixture
+def clock():
+    return FakeClock()
+
+
+@pytest.fixture
+def limiter(clock):
+    return download.RateLimiter(log_path=None, clock=clock.time, sleep=clock.sleep)
+
+
+def _mock_response(json_body: dict, status: int = 200, headers: dict | None = None) -> MagicMock:
     resp = MagicMock()
+    resp.status_code = status
+    resp.ok = 200 <= status < 300
+    resp.headers = headers or {}
     resp.json.return_value = json_body
-    if status_ok:
-        resp.raise_for_status.return_value = None
-    else:
-        resp.raise_for_status.side_effect = requests.exceptions.HTTPError("boom")
     return resp
 
 
-def test_fetch_locations_returns_results(monkeypatch):
-    session = requests.Session()
-    page = _mock_response({"results": [{"id": 1, "sensors": []}], "meta": {"found": 1}})
-    monkeypatch.setattr(session, "get", MagicMock(return_value=page))
-
-    locations = download.fetch_locations(session, 31.55, 74.34)
-
-    assert locations == [{"id": 1, "sensors": []}]
+# --- RateLimiter -------------------------------------------------------------------------------
 
 
-def test_fetch_locations_handles_network_failure(monkeypatch):
-    """Every attempt fails -> retries exhaust -> [] rather than raising."""
-    session = requests.Session()
-    monkeypatch.setattr(
-        session, "get", MagicMock(side_effect=requests.exceptions.ConnectionError("no network"))
+def test_limiter_spaces_requests_by_min_interval(limiter, clock):
+    start = clock.now
+    for _ in range(5):
+        limiter.wait()
+
+    assert clock.now - start == pytest.approx(4 * download.MIN_INTERVAL_S)
+
+
+def test_limiter_never_exceeds_per_minute_budget(clock):
+    limiter = download.RateLimiter(
+        log_path=None, min_interval=0, clock=clock.time, sleep=clock.sleep
     )
+    stamps = []
+    for _ in range(100):
+        limiter.wait()
+        stamps.append(clock.now)
 
-    locations = download.fetch_locations(session, 31.55, 74.34)
+    for i, t in enumerate(stamps):
+        in_window = [s for s in stamps[: i + 1] if s > t - 60]
+        assert len(in_window) <= download.MAX_PER_MINUTE
 
-    assert locations == []
-    assert session.get.call_count == download.RETRY_ATTEMPTS
+
+def test_limiter_never_exceeds_per_hour_budget(clock):
+    limiter = download.RateLimiter(
+        log_path=None, min_interval=0, per_minute=10_000, per_hour=50,
+        clock=clock.time, sleep=clock.sleep,
+    )
+    stamps = []
+    for _ in range(120):
+        limiter.wait()
+        stamps.append(clock.now)
+
+    for i, t in enumerate(stamps):
+        assert len([s for s in stamps[: i + 1] if s > t - 3600]) <= 50
 
 
-def test_fetch_locations_retries_then_succeeds(monkeypatch):
-    """A transient failure followed by a good response should still return data."""
+def test_limiter_budget_survives_a_rerun(tmp_path, clock):
+    """Requests from a previous run in the last hour still count — rerunning can't reset it."""
+    log_path = tmp_path / "_request_log.json"
+    first = download.RateLimiter(
+        log_path=log_path, min_interval=0, per_minute=10_000, per_hour=5,
+        clock=clock.time, sleep=clock.sleep,
+    )
+    for _ in range(5):
+        first.wait()
+
+    second = download.RateLimiter(
+        log_path=log_path, min_interval=0, per_minute=10_000, per_hour=5,
+        clock=clock.time, sleep=clock.sleep,
+    )
+    before = clock.now
+    second.wait()
+
+    assert clock.now - before >= 3599
+
+
+def test_limiter_stops_at_per_run_cap(clock):
+    limiter = download.RateLimiter(
+        log_path=None, min_interval=0, max_requests=3, clock=clock.time, sleep=clock.sleep
+    )
+    for _ in range(3):
+        limiter.wait()
+
+    with pytest.raises(download.RateLimitAbort):
+        limiter.wait()
+
+
+def test_limiter_pauses_when_openaq_reports_low_remaining(limiter, clock):
+    resp = _mock_response({}, headers={"x-ratelimit-remaining": "2", "x-ratelimit-reset": "40"})
+
+    limiter.observe(resp)
+
+    assert clock.slept == [40]
+
+
+# --- _request_json -----------------------------------------------------------------------------
+
+
+def test_401_is_fatal_and_not_retried(limiter, monkeypatch):
     session = requests.Session()
-    good_page = _mock_response({"results": [{"id": 1, "sensors": []}], "meta": {"found": 1}})
+    monkeypatch.setattr(session, "get", MagicMock(return_value=_mock_response({}, status=401)))
+
+    with pytest.raises(download.ApiKeyRejected):
+        download._request_json(session, limiter, "url", {}, what="test")
+    assert session.get.call_count == 1
+
+
+def test_single_429_waits_then_retries(limiter, clock, monkeypatch):
+    session = requests.Session()
     monkeypatch.setattr(
         session,
         "get",
-        MagicMock(side_effect=[requests.exceptions.ConnectionError("blip"), good_page]),
+        MagicMock(
+            side_effect=[
+                _mock_response({}, status=429, headers={"Retry-After": "30"}),
+                _mock_response({"results": [1]}),
+            ]
+        ),
     )
 
-    locations = download.fetch_locations(session, 31.55, 74.34)
+    assert download._request_json(session, limiter, "url", {}, what="test") == {"results": [1]}
+    assert max(clock.slept) >= 60  # waits at least a full minute window, not just Retry-After
 
-    assert locations == [{"id": 1, "sensors": []}]
 
-
-def test_fetch_locations_handles_missing_city(monkeypatch):
-    """A coordinate with no nearby stations should return [] instead of raising."""
+def test_second_429_aborts_the_run(limiter, monkeypatch):
     session = requests.Session()
-    empty_page = _mock_response({"results": [], "meta": {"found": 0}})
-    monkeypatch.setattr(session, "get", MagicMock(return_value=empty_page))
+    monkeypatch.setattr(session, "get", MagicMock(return_value=_mock_response({}, status=429)))
 
-    locations = download.fetch_locations(session, 0.0, 0.0)
+    with pytest.raises(download.RateLimitAbort):
+        download._request_json(session, limiter, "url", {}, what="test")
+    assert session.get.call_count == 2
 
-    assert locations == []
 
-
-def test_fetch_locations_handles_http_error(monkeypatch):
+def test_network_failure_retries_then_gives_up(limiter, monkeypatch):
     session = requests.Session()
-    bad_response = _mock_response({}, status_ok=False)
-    monkeypatch.setattr(session, "get", MagicMock(return_value=bad_response))
-
-    locations = download.fetch_locations(session, 31.55, 74.34)
-
-    assert locations == []
-
-
-def test_fetch_locations_filters_to_reference_monitors(monkeypatch):
-    session = requests.Session()
-    results = [
-        {"id": 1, "isMonitor": True, "provider": {"name": "StateAir"}},
-        {"id": 2, "isMonitor": False, "provider": {"name": "AirGradient"}},
-        {"id": 3, "isMonitor": False, "provider": {"name": "Hawanama"}},
-    ]
-    page = _mock_response({"results": results, "meta": {"found": 3}})
-    monkeypatch.setattr(session, "get", MagicMock(return_value=page))
-
-    locations = download.fetch_locations(session, 31.55, 74.34)
-
-    assert [loc["id"] for loc in locations] == [1]
-
-
-def test_fetch_locations_falls_back_when_no_reference_monitor(monkeypatch):
-    """If a city has only low-cost sensors nearby, don't return an empty list — use them."""
-    session = requests.Session()
-    results = [{"id": 2, "isMonitor": False, "provider": {"name": "AirGradient"}}]
-    page = _mock_response({"results": results, "meta": {"found": 1}})
-    monkeypatch.setattr(session, "get", MagicMock(return_value=page))
-
-    locations = download.fetch_locations(session, 31.55, 74.34)
-
-    assert [loc["id"] for loc in locations] == [2]
-
-
-def test_fetch_measurements_handles_non_numeric_found(monkeypatch):
-    """Regression test: OpenAQ returns meta.found as the string ">1000" once the true
-    count exceeds the page limit, instead of a number. A full-then-partial page pair
-    must not crash when that happens (it did, in production, on a multi-year range).
-    Only the 2015 chunk has data here; every other year in the range returns empty
-    immediately, since fetch_measurements now requests one calendar year at a time.
-    """
-    session = requests.Session()
-
-    def fake_get(url, params=None, timeout=None):
-        if params["datetime_from"].startswith("2015"):
-            if params["page"] == 1:
-                return _mock_response(
-                    {"results": [{"id": i} for i in range(1000)], "meta": {"found": ">1000"}}
-                )
-            return _mock_response({"results": [{"id": 1000}], "meta": {"found": ">1000"}})
-        return _mock_response({"results": [], "meta": {"found": 0}})
-
-    monkeypatch.setattr(session, "get", MagicMock(side_effect=fake_get))
-
-    measurements, complete = download.fetch_measurements(
-        session, 25135, "2015-01-01", "2026-09-15"
+    monkeypatch.setattr(
+        session, "get", MagicMock(side_effect=requests.exceptions.ConnectionError("down"))
     )
 
-    assert len(measurements) == 1001
+    assert download._request_json(session, limiter, "url", {}, what="test") is None
+    assert session.get.call_count == download.RETRY_ATTEMPTS
+    assert limiter.sent_this_run == download.RETRY_ATTEMPTS  # retries count against the budget
+
+
+def test_404_is_not_retried(limiter, monkeypatch):
+    session = requests.Session()
+    monkeypatch.setattr(session, "get", MagicMock(return_value=_mock_response({}, status=404)))
+
+    assert download._request_json(session, limiter, "url", {}, what="test") is None
+    assert session.get.call_count == 1
+
+
+# --- fetch_locations / fetch_monthly -----------------------------------------------------------
+
+
+def test_fetch_locations_filters_to_reference_monitors(limiter, monkeypatch):
+    session = requests.Session()
+    results = [{"id": 1, "isMonitor": True}, {"id": 2, "isMonitor": False}]
+    page = _mock_response({"results": results})
+    monkeypatch.setattr(session, "get", MagicMock(return_value=page))
+
+    assert [loc["id"] for loc in download.fetch_locations(session, limiter, 31.5, 74.3)] == [1]
+
+
+def test_fetch_locations_falls_back_when_no_reference_monitor(limiter, monkeypatch):
+    session = requests.Session()
+    page = _mock_response({"results": [{"id": 2, "isMonitor": False}]})
+    monkeypatch.setattr(session, "get", MagicMock(return_value=page))
+
+    assert [loc["id"] for loc in download.fetch_locations(session, limiter, 31.5, 74.3)] == [2]
+
+
+def test_fetch_locations_handles_missing_city(limiter, monkeypatch):
+    session = requests.Session()
+    monkeypatch.setattr(session, "get", MagicMock(return_value=_mock_response({"results": []})))
+
+    assert download.fetch_locations(session, limiter, 0.0, 0.0) == []
+
+
+def test_fetch_monthly_uses_monthly_endpoint_and_paginates(limiter, monkeypatch):
+    session = requests.Session()
+    full = _mock_response({"results": [{"value": 1}] * download.PAGE_LIMIT})
+    tail = _mock_response({"results": [{"value": 2}]})
+    monkeypatch.setattr(session, "get", MagicMock(side_effect=[full, tail]))
+
+    months, complete = download.fetch_monthly(session, limiter, 42, "2015-01-01", "2025-01-01")
+
+    assert len(months) == download.PAGE_LIMIT + 1
     assert complete is True
+    url, = session.get.call_args.args
+    assert url.endswith("/sensors/42/days/monthly")
+    assert session.get.call_args.kwargs["params"]["date_from"] == "2015-01-01"
 
 
-def test_fetch_measurements_reports_incomplete_on_persistent_failure(monkeypatch):
-    """If one year's requests never succeed, the station is marked incomplete (not silently
-    treated as done) — this is what makes the file's "complete" flag trustworthy for resuming.
-    """
+def test_fetch_monthly_reports_incomplete_on_failure(limiter, monkeypatch):
     session = requests.Session()
-
-    def fake_get(url, params=None, timeout=None):
-        if params["datetime_from"].startswith("2016"):
-            raise requests.exceptions.ConnectionError("down for this year")
-        return _mock_response({"results": [{"id": 1}], "meta": {"found": 1}})
-
-    monkeypatch.setattr(session, "get", MagicMock(side_effect=fake_get))
-
-    measurements, complete = download.fetch_measurements(
-        session, 25135, "2015-01-01", "2017-12-31"
+    monkeypatch.setattr(
+        session, "get", MagicMock(side_effect=requests.exceptions.ConnectionError("down"))
     )
 
-    assert complete is False
-    # 2015 and 2017 still contributed their data even though 2016 failed entirely.
-    assert len(measurements) == 2
+    months, complete = download.fetch_monthly(session, limiter, 42, "2015-01-01", "2025-01-01")
+
+    assert (months, complete) == ([], False)
 
 
-def test_year_chunks_splits_on_calendar_year_boundaries():
-    chunks = download._year_chunks("2015-06-01", "2017-03-01")
-
-    assert chunks == [
-        ("2015-06-01", "2015-12-31"),
-        ("2016-01-01", "2016-12-31"),
-        ("2017-01-01", "2017-03-01"),
-    ]
+# --- download_city -----------------------------------------------------------------------------
 
 
-def test_download_city_skips_already_complete_station(tmp_path, monkeypatch):
-    monkeypatch.setattr(download, "RAW_DIR", tmp_path)
-    out_dir = tmp_path / "lahore"
-    out_dir.mkdir()
-    (out_dir / "8664.json").write_text(
-        json.dumps({"complete": True, "measurements": [{"id": 1}]})
-    )
-
-    session = requests.Session()
-    location = {
+def _location(**overrides):
+    loc = {
         "id": 8664,
+        "name": "US Consulate",
         "isMonitor": True,
         "sensors": [{"id": 25135, "parameter": {"id": download.PM25_PARAMETER_ID}}],
     }
-    monkeypatch.setattr(
-        download,
-        "fetch_locations",
-        lambda *a, **k: [location],
-    )
-    get_mock = MagicMock()
-    monkeypatch.setattr(session, "get", get_mock)
+    loc.update(overrides)
+    return loc
 
-    download.download_city(session, "lahore", 31.55, 74.34, "2015-01-01", "2020-01-01")
 
-    get_mock.assert_not_called()
+def test_download_city_skips_already_complete_sensor(tmp_path, limiter, monkeypatch):
+    monkeypatch.setattr(download, "RAW_DIR", tmp_path)
+    (tmp_path / "lahore").mkdir()
+    (tmp_path / "lahore" / "25135.json").write_text(json.dumps({"complete": True, "results": []}))
+    monkeypatch.setattr(download, "fetch_locations", lambda *a, **k: [_location()])
+    session = requests.Session()
+    monkeypatch.setattr(session, "get", MagicMock())
+
+    download.download_city(session, limiter, "lahore", 31.5, 74.3, "2015-01-01", "2020-01-01")
+
+    session.get.assert_not_called()
+
+
+def test_download_city_skips_stations_outside_date_range(tmp_path, limiter, monkeypatch):
+    monkeypatch.setattr(download, "RAW_DIR", tmp_path)
+    old = _location(datetimeLast={"utc": "2012-06-01T00:00:00Z"})
+    monkeypatch.setattr(download, "fetch_locations", lambda *a, **k: [old])
+    session = requests.Session()
+    monkeypatch.setattr(session, "get", MagicMock())
+
+    download.download_city(session, limiter, "lahore", 31.5, 74.3, "2015-01-01", "2020-01-01")
+
+    session.get.assert_not_called()
+
+
+def test_download_city_writes_sensor_file(tmp_path, limiter, monkeypatch):
+    monkeypatch.setattr(download, "RAW_DIR", tmp_path)
+    monkeypatch.setattr(download, "fetch_locations", lambda *a, **k: [_location()])
+    session = requests.Session()
+    month = {"value": 88.1, "period": {"datetimeFrom": {"utc": "2019-01-01T00:00:00Z"}}}
+    page = _mock_response({"results": [month]})
+    monkeypatch.setattr(session, "get", MagicMock(return_value=page))
+
+    download.download_city(session, limiter, "lahore", 31.5, 74.3, "2015-01-01", "2020-01-01")
+
+    saved = json.loads((tmp_path / "lahore" / "25135.json").read_text())
+    assert saved["complete"] is True
+    assert saved["location_id"] == 8664
+    assert saved["results"] == [month]
 
 
 def test_pm25_sensor_ids_filters_to_pm25_only():
