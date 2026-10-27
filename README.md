@@ -11,7 +11,8 @@ London, Sydney, Santiago
 **Status:** Phase 2 — raw temperature (NOAA GHCN) and air quality (OpenAQ) for all eleven cities
 are cleaned into validated annual series. Analysis (Phase 2.5) and SQL/JSON export (Phase 3) next.
 
-See [`ROADMAP.md`](./ROADMAP.md) for the full build plan, data sources, git workflow, and CI/CD
+See [`PROJECT_LOG.md`](./PROJECT_LOG.md) for what has been built so far, the results, the
+problems found along the way, and every data source. See [`ROADMAP.md`](./ROADMAP.md) for the full build plan, data sources, git workflow, and CI/CD
 strategy — including the pipeline diagram.
 
 ## Project layout
