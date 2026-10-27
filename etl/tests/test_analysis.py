@@ -99,6 +99,24 @@ def test_correlation_only_over_overlapping_years():
     assert corr["r"] == pytest.approx(1.0)
 
 
+def test_detrended_correlation_removes_shared_drift():
+    """Two series that both rise steadily correlate strongly raw, but if their year-to-year
+    wiggles are opposite, the detrended r must come out negative."""
+    years = list(range(2016, 2026))
+    wiggle = [0.1, -0.1] * 5
+    temp = pd.DataFrame(
+        {"city": "x", "year": years, "anomaly_c": [0.1 * i + w for i, w in enumerate(wiggle)]}
+    )
+    aq = pd.DataFrame(
+        {"city": "x", "year": years, "pm25": [10 + 2 * i - 10 * w for i, w in enumerate(wiggle)]}
+    )
+
+    corr = analysis.temp_pm25_correlation(temp, aq).iloc[0]
+
+    assert corr["r"] > 0.8
+    assert corr["r_detrended"] == pytest.approx(-1.0)
+
+
 def test_summarize_is_json_ready_with_integer_years(monkeypatch):
     monkeypatch.setattr(analysis, "CITIES", {"x": (0.0, 0.0)})
     temp = _temp("x", range(1961, 2026), base=15.0, per_decade=0.2)

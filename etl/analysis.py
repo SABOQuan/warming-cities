@@ -16,10 +16,12 @@ Methodology decisions:
    With 4-11 years of data these are short records: trends from fewer than MIN_PM25_YEARS years
    are reported as insufficient rather than given a slope.
 4. Temperature vs PM2.5: Pearson r between annual temperature anomaly and annual PM2.5 over the
-   years both exist. Correlation is NOT causation — warming is driven by global greenhouse gas
-   concentrations, PM2.5 by local emissions and weather; with at most ~11 overlapping years,
-   any r here is weak evidence either way. It's computed because the roadmap asks for it, and
-   reported with its p-value and n so it can't be over-read.
+   years both exist, both raw and after removing each series' linear trend. The detrended r is
+   the one to read: two series that merely both drift over the same years correlate raw without
+   any year-to-year link. Correlation is NOT causation — warming is driven by global greenhouse
+   gas concentrations, PM2.5 by local emissions and weather (hot, stagnant years trap
+   pollution); with at most ~11 overlapping years and nine cities tested, any single r is weak
+   evidence. Reported with p-values and n so it can't be over-read.
 """
 
 from __future__ import annotations
@@ -158,17 +160,27 @@ def temp_pm25_correlation(
     aq_annual: pd.DataFrame,
     min_overlap: int = MIN_OVERLAP_YEARS,
 ) -> pd.DataFrame:
-    """Per city: Pearson r between temperature anomaly and PM2.5 over overlapping years.
-    See module docstring, point 4, for why this is reported but not interpreted causally."""
+    """Per city: Pearson r (raw and detrended) between temperature anomaly and PM2.5 over
+    overlapping years. See module docstring, point 4, for why this isn't read causally."""
     merged = temp_with_anomalies.merge(aq_annual, on=["city", "year"])
     rows = []
     for city, group in merged.groupby("city", sort=False):
         row = {"city": city, "n_years": int(len(group))}
         if len(group) >= min_overlap:
             r, p = stats.pearsonr(group["anomaly_c"], group["pm25"])
-            row.update(r=float(r), p_value=float(p))
+            r_d, p_d = stats.pearsonr(
+                _detrend(group["year"], group["anomaly_c"]), _detrend(group["year"], group["pm25"])
+            )
+            row.update(r=float(r), p_value=float(p), r_detrended=float(r_d), p_detrended=float(p_d))
         rows.append(row)
     return pd.DataFrame(rows)
+
+
+def _detrend(years: pd.Series, values: pd.Series) -> np.ndarray:
+    """Residuals of values after removing their OLS line on years."""
+    x = np.asarray(years, dtype=float)
+    y = np.asarray(values, dtype=float)
+    return y - np.polyval(np.polyfit(x, y, 1), x)
 
 
 def summarize(temp_annual: pd.DataFrame, aq_annual: pd.DataFrame) -> dict[str, dict]:
@@ -187,7 +199,7 @@ def summarize(temp_annual: pd.DataFrame, aq_annual: pd.DataFrame) -> dict[str, d
             if not isinstance(value, float):
                 return value
             # p-values span many orders of magnitude; 4 decimals would turn 1e-9 into 0.0
-            return float(f"{value:.3g}") if key == "p_value" else round(value, 4)
+            return float(f"{value:.3g}") if key.startswith("p_") else round(value, 4)
 
         return {
             k: tidy(k, v) for k, v in row.items() if not (isinstance(v, float) and np.isnan(v))
