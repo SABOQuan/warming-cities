@@ -2,6 +2,7 @@
 pandas>=2.2
 requests>=2.32
 python-dotenv>=1.0
+scipy>=1.13
 
 # Dev tooling
 pytest>=8.0
