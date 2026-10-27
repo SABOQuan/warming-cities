@@ -7,10 +7,10 @@ worldwide, all in two plain-text files inside one .tar.gz. So the approach here 
 1. Download that one archive (a few dozen MB, a few dozen times smaller than air quality's 10
    separate per-station histories, and no rate limit / API key / ToS risk since it's a static
    file, not an API).
-2. Parse the station inventory (.inv) to find, for each of our 10 cities, the single nearest
+2. Parse the station inventory (.inv) to find, for each of our 11 cities, the single nearest
    weather station — same "nearest station" idea as the OpenAQ radius search, just done locally
    on the inventory file instead of via HTTP calls.
-3. Parse the data file (.dat) and pull out only the rows for those 10 matched stations.
+3. Parse the data file (.dat) and pull out only the rows for those 11 matched stations.
 
 We use the "qcf" variant (quality-controlled AND bias-corrected via NOAA's Pairwise Homogeneity
 Algorithm — station moves, instrument swaps, and time-of-observation changes are corrected for).
@@ -22,7 +22,7 @@ live/real-time), so the most recent row already present in a station's downloade
 current figure for this project's purposes — nothing extra to do for that.
 
 Usage:
-    python download_temperature.py                # all 10 cities, safe to rerun/resumes
+    python download_temperature.py                # all 11 cities, safe to rerun/resumes
     python download_temperature.py --city lahore   # just one, for testing
     python download_temperature.py --overwrite     # re-download the archive, redo station matching
 """
