@@ -8,8 +8,9 @@ experience.
 **Cities:** Lahore, Beijing, São Paulo, Addis Ababa, New York, Delhi, Ho Chi Minh City, Jakarta,
 London, Sydney, Santiago
 
-**Status:** Phase 2 — raw temperature (NOAA GHCN) and air quality (OpenAQ) for all eleven cities
-are cleaned into validated annual series. Analysis (Phase 2.5) and SQL/JSON export (Phase 3) next.
+**Status:** Phases 1–3 done — temperature (NOAA GHCN) and air quality (OpenAQ) for all eleven
+cities are downloaded, cleaned, analysed, aggregated in SQLite, and exported to JSON in
+`web/public/data/`. The frontend (Phases 4–7) is next.
 
 See [`PROJECT_LOG.md`](./PROJECT_LOG.md) for what has been built so far, the results, the
 problems found along the way, and every data source. See [`ROADMAP.md`](./ROADMAP.md) for the full build plan, data sources, git workflow, and CI/CD
