@@ -75,7 +75,7 @@ export function Compare({ cities, selected, onChange }: CompareProps) {
       color: colorOf.get(c.id) ?? SERIES[0],
       points: c.temperature.map((t) => ({
         x: t.year,
-        y: t.rolling_c === null ? null : t.rolling_c - c.baseline.baseline_c,
+        y: t.rolling_c,
       })),
     }));
 
