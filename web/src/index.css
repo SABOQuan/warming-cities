@@ -66,3 +66,28 @@ body {
   width: 100%;
   max-width: 60rem;
 }
+
+/* Phase 6 */
+.year-range,
+.compare-picker {
+  margin: 0.75rem 0;
+}
+.year-presets button[aria-pressed='true'] {
+  font-weight: bold;
+}
+.legend {
+  display: flex;
+  gap: 1rem;
+  list-style: none;
+  padding: 0;
+}
+.swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+.chart-direct-label {
+  font-size: 11px;
+  fill: #111;
+}
