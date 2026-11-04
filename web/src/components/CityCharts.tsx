@@ -9,7 +9,6 @@ const PM_FILL = '#6f7f8f';
 
 /** Annual anomaly bars (warm/cool against the baseline) with the 10-year rolling mean on top. */
 export function TemperatureChart({ city, range }: { city: CityData; range: Domain }) {
-  const base = city.baseline.baseline_c;
   const byYear = new Map(city.temperature.map((t) => [t.year, t]));
   const [b0, b1] = city.baseline.period;
 
@@ -29,7 +28,7 @@ export function TemperatureChart({ city, range }: { city: CityData; range: Domai
           color: INK,
           points: city.temperature.map((t) => ({
             x: t.year,
-            y: t.rolling_c === null ? null : t.rolling_c - base,
+            y: t.rolling_c,
           })),
         },
       ]}
@@ -43,7 +42,7 @@ export function TemperatureChart({ city, range }: { city: CityData; range: Domai
             <span>
               {fmt(t.temp_c, 1)} °C mean, {signed(t.anomaly_c)} °C vs {b0}–{b1}
             </span>
-            {t.rolling_c !== null && <span>10-yr mean: {signed(t.rolling_c - base)} °C</span>}
+            {t.rolling_c !== null && <span>10-yr mean: {signed(t.rolling_c)} °C</span>}
             {t.n_months < 12 && <span className="tip-muted">{t.n_months}/12 months observed</span>}
           </>
         );
