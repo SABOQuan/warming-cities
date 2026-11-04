@@ -1,185 +1,126 @@
-import { useState } from 'react';
-import { useCitiesIndex, useCity } from './data';
-import type { CitiesIndex, CityData } from './types';
-import { Pm25Chart, TemperatureChart } from './components/CityCharts';
 import { Compare } from './components/Compare';
-import { Stripes } from './components/Stripes';
-import { YearRange } from './components/YearRange';
-import { fmt } from './lib/format';
-import type { Domain } from './lib/scale';
+import { Fuzzy } from './components/Fuzzy';
+import { useCitiesIndex } from './data';
+import { catalogue } from './lib/catalog';
+import { signed } from './lib/format';
+import { City } from './pages/City';
+import { Home } from './pages/Home';
+import { Methods } from './pages/Methods';
+import { href, replaceHash, useRoute, type Route } from './router';
+import type { CitiesIndex } from './types';
 
-// Phase 6: year-range filter and multi-city comparison; the visual design comes in Phase 7.
+const DEFAULT_COMPARE = ['london', 'delhi', 'sao_paulo'];
 
-function CityDetail({ city, guideline }: { city: CityData; guideline: number }) {
-  const years = city.temperature.map((t) => t.year);
-  const bounds: Domain = [years[0], years[years.length - 1]];
-  const [range, setRange] = useState<Domain>(bounds);
-
-  const { stats } = city;
-  const trend = stats.temperature_trend;
-  const pm = stats.pm25_trend;
-  const corr = stats.temp_pm25_correlation;
-
+/** A slow ticker of each city's 2016-25 anomaly, the way a 2001 portal ran stock prices. */
+function Ticker({ index }: { index: CitiesIndex }) {
+  const items = (copy: string) =>
+    catalogue(index.cities).map((c) => (
+      <span key={`${copy}-${c.id}`} className="ticker-item">
+        {c.name.toUpperCase()} <b>{signed(c.recent_anomaly_c)} °C</b>
+      </span>
+    ));
   return (
-    <article>
-      <h2>{city.name}</h2>
-      <p>
-        Station: {city.station.station_name} ({city.station.station_id}), {city.station.distance_km}{' '}
-        km from the city centre. Baseline {city.baseline.period.join('–')}:{' '}
-        {fmt(city.baseline.baseline_c)} °C.
-      </p>
-
-      <h3>Stats</h3>
-      <ul>
-        <li>Recent anomaly: {fmt(stats.recent_anomaly_c)} °C</li>
-        {trend && (
-          <li>
-            Warming trend {trend.first_year}–{trend.last_year}: {fmt(trend.per_decade_c, 3)}{' '}
-            °C/decade (95% CI {fmt(trend.ci95_low_c, 3)} to {fmt(trend.ci95_high_c, 3)})
-          </li>
-        )}
-        {pm && (
-          <li>
-            PM2.5 {pm.first_year}–{pm.last_year}: mean {fmt(pm.mean_pm25, 1)} µg/m³
-            {pm.sufficient && `, ${fmt(pm.pct_per_year, 1)}% per year`}
-          </li>
-        )}
-        {corr && (
-          <li>
-            Temp vs PM2.5 correlation: r = {fmt(corr.r)} (detrended {fmt(corr.r_detrended)}), n ={' '}
-            {corr.n_years}
-          </li>
-        )}
-      </ul>
-
-      {city.notes.length > 0 && (
-        <>
-          <h3>Notes</h3>
-          <ul>
-            {city.notes.map((n) => (
-              <li key={n}>{n}</li>
-            ))}
-          </ul>
-        </>
-      )}
-
-      <h3>Warmest years</h3>
-      <ol>
-        {city.warmest_years.map((w) => (
-          <li key={w.year}>
-            {w.year}: +{fmt(w.anomaly_c)} °C
-          </li>
-        ))}
-      </ol>
-
-      <Stripes temperature={city.temperature} label={`Warming stripes for ${city.name}`} />
-
-      <h3>Annual temperature ({city.temperature.length} years)</h3>
-      <YearRange bounds={bounds} value={range} onChange={setRange} />
-      <TemperatureChart city={city} range={range} />
-      <details>
-        <summary>View as table</summary>
-        <table>
-          <thead>
-            <tr>
-              <th>Year</th>
-              <th>Mean °C</th>
-              <th>Anomaly °C</th>
-              <th>10-yr mean anomaly °C</th>
-            </tr>
-          </thead>
-          <tbody>
-            {city.temperature.map((t) => (
-              <tr key={t.year}>
-                <td>{t.year}</td>
-                <td>{fmt(t.temp_c)}</td>
-                <td>{fmt(t.anomaly_c)}</td>
-                <td>{fmt(t.rolling_c)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </details>
-
-      <h3>Annual PM2.5 ({city.air_quality.length} years)</h3>
-      <Pm25Chart city={city} guideline={guideline} />
-      <details>
-        <summary>View as table</summary>
-        <table>
-          <thead>
-            <tr>
-              <th>Year</th>
-              <th>PM2.5 µg/m³</th>
-              <th>× WHO guideline</th>
-              <th>Monitors</th>
-            </tr>
-          </thead>
-          <tbody>
-            {city.air_quality.map((a) => (
-              <tr key={a.year}>
-                <td>{a.year}</td>
-                <td>{fmt(a.pm25, 1)}</td>
-                <td>{fmt(a.who_multiple, 1)}</td>
-                <td>{a.n_locations}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </details>
-    </article>
+    <div className="ticker" aria-hidden="true">
+      <div className="ticker-track">
+        {items('a')}
+        {items('b')}
+      </div>
+    </div>
   );
 }
 
-function CityView({ id, guideline }: { id: string; guideline: number }) {
-  const city = useCity(id);
-  if (city.status === 'loading') return <p>Loading city…</p>;
-  if (city.status === 'error') return <p role="alert">{city.error}</p>;
-  return <CityDetail key={city.data.id} city={city.data} guideline={guideline} />;
+function Nav({ route }: { route: Route }) {
+  const links: [string, string, Route['page']][] = [
+    ['index', href.index, 'index'],
+    ['compare', href.compare(), 'compare'],
+    ['methods', href.methods, 'methods'],
+  ];
+  return (
+    <nav className="nav" aria-label="Site">
+      {links.map(([label, to, page]) => (
+        <a key={page} href={to} aria-current={route.page === page ? 'page' : undefined}>
+          {label}
+        </a>
+      ))}
+    </nav>
+  );
 }
 
-function Explorer({ index }: { index: CitiesIndex }) {
-  const [selected, setSelected] = useState(index.cities[0]?.id ?? null);
-  const [compare, setCompare] = useState<string[]>(index.cities.slice(0, 2).map((c) => c.id));
-  const { methodology } = index;
-
-  return (
-    <>
-      <label>
-        City:{' '}
-        <select value={selected ?? ''} onChange={(e) => setSelected(e.target.value)}>
-          {index.cities.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      {selected && <CityView id={selected} guideline={methodology.who_pm25_guideline} />}
-
-      <h2>Compare cities</h2>
-      <Compare cities={index.cities} selected={compare} onChange={setCompare} />
-
-      <footer>
-        <p>{methodology.caveat}</p>
-        <p>
-          Sources: {methodology.sources.temperature}; {methodology.sources.air_quality}. Data
-          generated {index.generated}.
-        </p>
-      </footer>
-    </>
-  );
+function Page({ route, index }: { route: Route; index: CitiesIndex }) {
+  switch (route.page) {
+    case 'city':
+      return <City id={route.id} index={index} />;
+    case 'compare': {
+      const known = new Set(index.cities.map((c) => c.id));
+      const ids = (route.ids ?? DEFAULT_COMPARE).filter((id) => known.has(id));
+      const [b0, b1] = index.methodology.baseline_period;
+      return (
+        <article>
+          <Fuzzy as="h1" className="page-title" amount={0.28}>
+            Compare
+          </Fuzzy>
+          <p className="block-lede">
+            Ten-year rolling means against each city&rsquo;s own {b0}–{b1} average, so the lines
+            show how much each place has changed, not which one is hotter.
+          </p>
+          <Compare
+            cities={catalogue(index.cities)}
+            selected={ids}
+            onChange={(next) => replaceHash(href.compare(next))}
+          />
+        </article>
+      );
+    }
+    case 'methods':
+      return <Methods index={index} />;
+    default:
+      return <Home index={index} />;
+  }
 }
 
 export default function App() {
+  const route = useRoute();
   const index = useCitiesIndex();
 
   return (
-    <main>
-      <h1>Warming Cities</h1>
-      {index.status === 'loading' && <p>Loading…</p>}
-      {index.status === 'error' && <p role="alert">{index.error}</p>}
-      {index.status === 'ready' && <Explorer index={index.data} />}
-    </main>
+    <div className="site">
+      <a className="skip" href="#main">
+        Skip to content
+      </a>
+      <header className="masthead">
+        {index.status === 'ready' && <Ticker index={index.data} />}
+        <a href={href.index} className="wordmark-link" aria-label="Warming Cities, home">
+          <Fuzzy as="span" className="wordmark" amount={0.32}>
+            Warming Cities
+          </Fuzzy>
+        </a>
+        <p className="tagline">
+          temperature &amp; air in eleven cities, from the first readings to 2025
+        </p>
+        <Nav route={route} />
+      </header>
+
+      <main id="main">
+        {index.status === 'loading' && <p className="loading">Loading&hellip;</p>}
+        {index.status === 'error' && <p role="alert">{index.error}</p>}
+        {index.status === 'ready' && <Page route={route} index={index.data} />}
+      </main>
+
+      <footer className="colophon">
+        <p className="divider" aria-hidden="true">
+          * &nbsp; * &nbsp; *
+        </p>
+        {index.status === 'ready' && (
+          <p>
+            Temperature: {index.data.methodology.sources.temperature}. Air quality:{' '}
+            {index.data.methodology.sources.air_quality}. Data generated {index.data.generated}.
+          </p>
+        )}
+        <p>
+          &copy; Warming Cities 2026. Temperature and PM2.5 are shown side by side, not as cause and
+          effect. <a href={href.methods}>How it&rsquo;s made</a>.
+        </p>
+      </footer>
+    </div>
   );
 }
