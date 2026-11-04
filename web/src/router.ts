@@ -47,7 +47,9 @@ export function useRoute(): Route {
 
   // New page (or another city) starts at the top; filter changes within a page don't jump.
   const pageKey = route.page === 'city' ? `city:${route.id}` : route.page;
-  useEffect(() => window.scrollTo(0, 0), [pageKey]);
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pageKey]);
 
   return route;
 }
