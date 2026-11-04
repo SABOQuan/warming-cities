@@ -36,6 +36,7 @@ export interface TemperatureYear {
   temp_c: number;
   anomaly_c: number;
   n_months: number;
+  /** Centred rolling mean of anomaly_c (not of temp_c). */
   rolling_c: number | null;
 }
 

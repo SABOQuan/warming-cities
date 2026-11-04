@@ -80,7 +80,7 @@ function CityDetail({ city, guideline }: { city: CityData; guideline: number }) 
               <th>Year</th>
               <th>Mean °C</th>
               <th>Anomaly °C</th>
-              <th>10-yr rolling °C</th>
+              <th>10-yr mean anomaly °C</th>
             </tr>
           </thead>
           <tbody>
