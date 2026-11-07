@@ -23,3 +23,18 @@ CITIES: dict[str, tuple[float, float]] = {
     "sydney": (-33.8688, 151.2093),
     "santiago": (-33.4489, -70.6693),
 }
+
+# city -> display name, for the exported JSON and the site.
+CITY_NAMES: dict[str, str] = {
+    "lahore": "Lahore",
+    "beijing": "Beijing",
+    "sao_paulo": "São Paulo",
+    "addis_ababa": "Addis Ababa",
+    "new_york": "New York",
+    "delhi": "Delhi",
+    "ho_chi_minh_city": "Ho Chi Minh City",
+    "jakarta": "Jakarta",
+    "london": "London",
+    "sydney": "Sydney",
+    "santiago": "Santiago",
+}

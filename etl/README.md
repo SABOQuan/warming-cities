@@ -20,9 +20,21 @@ Modules to be added phase by phase (see `../ROADMAP.md`):
   temperature-vs-PM2.5 correlation. Writes `data/processed/analysis_summary.json` for export.
 - `notebooks/exploratory_analysis.ipynb` — Phase 2.5. Charts, findings, and the methodology and
   caveats, built on `analysis.py`. Needs `pip install -r requirements-notebook.txt`.
-- `aggregate.py` — Phase 3. Load cleaned data into SQLite, run the SQL aggregation queries
-  (annual mean, anomaly vs. 1961-1990 baseline, extreme-heat-day counts).
-- `export.py` — Phase 3. Write the final per-city JSON to `../web/public/data/`.
+- `aggregate.py` — Phase 3. Loads the cleaned data into SQLite (`data/warming_cities.sqlite`)
+  and does the aggregation in SQL: 1961-1990 baselines, anomalies, extreme-heat months (> 2 sd
+  above that calendar month's baseline normal — GHCN-Monthly has no daily data), decade means,
+  warmest years.
+- `export.py` — Phase 3. Combines the SQL results with `analysis.py`'s statistics and writes
+  one JSON per city plus `cities.json` to `../web/public/data/`. That JSON is committed — it's
+  what the deployed site serves.
+
+## Rebuilding the data
+
+```bash
+python download_temperature.py   # NOAA archive, no key needed
+python download_air_quality.py   # needs OPENAQ_API_KEY in .env; rate-limited, resumable
+python clean.py && python analysis.py && python export.py
+```
 
 ## Setup
 

@@ -50,7 +50,7 @@ flowchart TD
     subgraph SQL["SQL Aggregation (Phase 3)"]
         C1["Annual mean per city"]
         C2["Anomaly vs 1961-1990 baseline"]
-        C3["Extreme-heat-day counts"]
+        C3["Extreme-heat month counts"]
     end
 
     subgraph DS["Data Science Layer (Phase 2.5)"]
@@ -259,9 +259,10 @@ plumbing.
 ### Phase 3 — Aggregation (SQL) & export
 Branch: `feat/aggregate-export`
 
-- Load cleaned data into SQLite: `temperature`, `air_quality`, `sea_level` tables.
-- Write SQL for: annual mean per city, anomaly vs. the 1961–1990 baseline, extreme-heat-day counts,
-  annual AQ mean, annual sea-level mean (coastal subset).
+- Load cleaned data into SQLite: `stations`, `temperature_monthly`, `temperature_annual`,
+  `air_quality_annual` tables.
+- Write SQL for: annual mean per city, anomaly vs. the 1961–1990 baseline, extreme-heat month counts (GHCN-Monthly has no daily data, so: months > 2 sd above that calendar month's 1961–1990 normal),
+  and annual AQ mean.
 - Pull in the Phase 2.5 derived values (trend slope, correlation coefficients) as additional fields.
 - Export query results to `web/public/data/*.json`, one file (or object) per city.
 - Test: assert exported JSON matches expected shape and a known reference value (sanity check

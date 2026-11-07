@@ -19,8 +19,8 @@ etl/data/processed/*
 !etl/data/processed/.gitkeep
 *.sqlite
 *.sqlite3
-web/public/data/*
-!web/public/data/.gitkeep
+# web/public/data/*.json is the exported site data and IS committed: the deployed site is
+# built from the repo, which has no raw data or OpenAQ key to regenerate it (see etl/export.py).
 
 # --- Env / secrets ---
 .env
