@@ -1,0 +1,4 @@
+etl/
+**/node_modules
+web/dist
+.vscode

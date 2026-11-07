@@ -21,7 +21,7 @@ every source the project relies on. `ROADMAP.md` is the plan; this file is the r
 | 5 | Core charts (SVG) | `feat/charts-core` | [#7](https://github.com/SABOQuan/warming-cities/pull/7) | Merged |
 | 6 | Year range + comparison | `feat/interactivity` | [#8](https://github.com/SABOQuan/warming-cities/pull/8) | Merged |
 | 7 | Y2K design pass | `feat/ui-theme` | [#9](https://github.com/SABOQuan/warming-cities/pull/9) | Merged |
-| 8 | Deployment | — | — | Not done: the site is a static build and can be hosted anywhere |
+| 8 | Deployment | `chore/vercel-deploy` | — | Live at <https://warming-cities.vercel.app> (Vercel) |
 | 9 | README, methodology, cleanup | `docs/final-readme` | [#10](https://github.com/SABOQuan/warming-cities/pull/10) | Merged |
 
 All PRs were stacked and merged into `main` in order (#1 → #10) on 2026-11-07, with CI green.
