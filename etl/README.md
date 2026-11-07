@@ -4,8 +4,14 @@ Python pipeline: raw data in, cleaned + modeled JSON out for the frontend to con
 
 Modules to be added phase by phase (see `../ROADMAP.md`):
 
-- `download.py` — Phase 1. Pull raw temperature (NOAA GHCN-Monthly), air quality (OpenAQ), and
-  sea-level (PSMSL, coastal cities only) data per city into `data/raw/`.
+- `cities.py` — the locked list of 11 cities (name -> lat/lon), shared by every download script.
+- `download_air_quality.py` — Phase 1. Pull monthly PM2.5 aggregates per station from the OpenAQ
+  v3 API into `data/raw/openaq/`, through a rate limiter set to half of OpenAQ's limits (30/min,
+  1,000/hour, tracked across runs). Run `--city lahore` first to confirm the key works.
+- `download_temperature.py` — Phase 1. Pull monthly temperature history per city from NOAA
+  GHCN-Monthly into `data/raw/ghcn/`.
+- `download_sea_level.py` — deferred to v2. Local sea-level change mixes land subsidence and
+  global rise, which is out of scope for this version.
 - `clean.py` — Phase 2. Parse, validate, and normalize each raw dataset into a common annual
   granularity per city.
 - `notebooks/exploratory_analysis.ipynb` — Phase 2.5. Trend regression, rolling averages,

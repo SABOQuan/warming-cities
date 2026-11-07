@@ -1,6 +1,7 @@
 # Core
 pandas>=2.2
 requests>=2.32
+python-dotenv>=1.0
 
 # Dev tooling
 pytest>=8.0

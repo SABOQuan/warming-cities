@@ -13,27 +13,32 @@ below as one feature branch and one pull request into `main`.
 
 ## Cities
 
-Lahore, Beijing, São Paulo, Cairo, New York, Delhi, Manila, Jakarta, London, Sydney — ten cities
-spanning six continents and both hemispheres, mixing long-baseline developed-world stations (London,
-New York, Sydney) with the climate-risk-hotspot megacities that carry the "how hot is the world
-getting" narrative (Delhi, Beijing, Lahore, Jakarta, Manila, Cairo).
+Lahore, Beijing, São Paulo, Addis Ababa, New York, Delhi, Ho Chi Minh City, Jakarta, London,
+Sydney, Santiago — eleven cities spanning six continents and both hemispheres, mixing
+long-baseline developed-world stations (London, New York, Sydney) with the climate-risk-hotspot
+megacities that carry the "how hot is the world getting" narrative (Delhi, Beijing, Lahore,
+Jakarta, Ho Chi Minh City, Addis Ababa).
+
+Changed during Phase 1: Manila and Cairo were swapped for Ho Chi Minh City and Addis Ababa, and
+Santiago was added, because OpenAQ only has PM2.5 for Manila and Cairo from 2023 — too short to
+show a trend. Each replacement has PM2.5 from 2016 and a GHCN temperature record covering the
+1961–1990 baseline.
 
 ## Datasets
 
 | Metric | Source | Coverage | Notes |
 |---|---|---|---|
-| Temperature | [NOAA GHCN-Monthly](https://www.ncei.noaa.gov/products/land-based-station/global-historical-climatology-network-monthly) | All 10 cities, 50+ years (London's Central England Temperature record runs to 1659) | Primary metric, baseline = 1961–1990 |
-| Air quality (PM2.5 primary) | [OpenAQ API](https://docs.openaq.org/about/about), supplemented by [WHO Ambient Air Quality Database](https://www.who.int/data/gho/data/themes/air-pollution) | All 10 cities, but typically only from ~mid-2010s onward — document this shorter window explicitly, don't extrapolate backward | Core secondary metric |
-| Sea level | [PSMSL](https://psmsl.org/) tide-gauge records | Coastal subset only: New York, Jakarta, Manila, London | Optional per-city layer, not shown on landlocked cities. Note for Jakarta specifically: local relative sea-level change there is dominated by land subsidence from groundwater extraction, not global sea-level rise — call this out in the methodology, don't conflate the two |
+| Temperature | [NOAA GHCN-Monthly](https://www.ncei.noaa.gov/products/land-based-station/global-historical-climatology-network-monthly) | All 11 cities, 50+ years (London's Central England Temperature record runs to 1659) | Primary metric, baseline = 1961–1990 |
+| Air quality (PM2.5 primary) | [OpenAQ API](https://docs.openaq.org/about/about), supplemented by [WHO Ambient Air Quality Database](https://www.who.int/data/gho/data/themes/air-pollution) | All 11 cities, from 2016 at the earliest (Lahore from 2019; Sydney ends 2022, Ho Chi Minh City 2024) — document this shorter window explicitly, don't extrapolate backward | Core secondary metric. Pulled as monthly aggregates with coverage stats |
+| ~~Sea level~~ | [PSMSL](https://psmsl.org/) tide-gauge records | Deferred to v2 | Local relative sea-level change mixes land subsidence (dominant in Jakarta), tectonics and global rise — out of scope for this version |
 
 ## Pipeline overview
 
 ```mermaid
 flowchart TD
     subgraph SRC["Data Sources"]
-        A1["NOAA GHCN-Monthly<br/>temperature, all 10 cities"]
-        A2["OpenAQ API<br/>air quality, all 10 cities"]
-        A3["PSMSL<br/>sea level — coastal subset only"]
+        A1["NOAA GHCN-Monthly<br/>temperature, all 11 cities"]
+        A2["OpenAQ API<br/>air quality, all 11 cities"]
     end
 
     subgraph ETL["Python ETL (Phases 1-2)"]
@@ -74,7 +79,6 @@ flowchart TD
 
     A1 --> B1
     A2 --> B1
-    A3 --> B1
     B1 --> B2 --> B3
     B3 --> C1 & C2 & C3
     C1 & C2 & C3 --> D1 --> D2 --> D3 --> D4
@@ -207,18 +211,17 @@ Branch: `chore/repo-setup`
 ### Phase 1 — Data acquisition
 Branch: `feat/data-download`
 
-- City list locked: Lahore, Beijing, São Paulo, Cairo, New York, Delhi, Manila, Jakarta, London, Sydney.
+- City list locked: Lahore, Beijing, São Paulo, Addis Ababa, New York, Delhi, Ho Chi Minh City,
+  Jakarta, London, Sydney, Santiago.
 - Script to download raw monthly temperature series per city from NOAA GHCN-Monthly.
 - Script to pull air-quality history per city from the OpenAQ API (PM2.5 primary), plus a WHO
   Ambient Air Quality Database pull as a supplementary/longer-range reference.
-- Script to download the nearest PSMSL tide-gauge record for the coastal subset (New York, Jakarta,
-  Manila, London) only.
 - Cache raw downloads in `data/raw/` (gitignored if large; commit a small sample or a fetch script
   instead of huge raw files).
 - Unit tests: each download client handles a missing city / network failure gracefully.
 
-**Definition of done:** running the scripts produces raw temperature, air-quality, and (coastal-only)
-sea-level files for every applicable city, with tests passing in CI.
+**Definition of done:** running the scripts produces raw temperature and air-quality files for
+every city, with tests passing in CI.
 
 ### Phase 2 — Cleaning & validation
 Branch: `feat/etl-cleaning`
@@ -245,8 +248,6 @@ Branch: `feat/eda-modeling`
   caveat that correlation here does not imply causation — warming is driven by global greenhouse gas
   concentrations, air quality by local pollution sources, and they are largely independent
   mechanisms that happen to co-occur.
-- For Jakarta specifically: note in the writeup that local relative sea-level change there is
-  dominated by land subsidence, not global sea-level rise.
 - Optional: a clearly-labeled naive linear projection a decade or two forward.
 - Output: documented findings (markdown or notebook narrative) that Phase 3's export step draws its
   final numbers from.
@@ -318,7 +319,7 @@ Branch: `docs/final-writeup`
 
 ## 3. Suggested order of operations, week by week (adjust to your pace)
 
-1. Phase 0–1 — repo, CI, data download working (temperature, air quality, coastal-subset sea level).
+1. Phase 0–1 — repo, CI, data download working (temperature, air quality).
 2. Phase 2 — cleaning and validation across all three datasets.
 3. Phase 2.5 — exploratory analysis notebook: trend regression, correlation analysis, documented caveats.
 4. Phase 3 — SQL aggregation and JSON export, including the derived statistical fields.
