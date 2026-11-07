@@ -12,20 +12,19 @@ every source the project relies on. `ROADMAP.md` is the plan; this file is the r
 | Phase | What | Branch | PR | State |
 |---|---|---|---|---|
 | 0 | Repo, tooling, CI | `chore/repo-setup` | — | Merged to `main` |
-| 1 | Data download (temperature + air quality) | `feat/data-download` | [#1](https://github.com/SABOQuan/warming-cities/pull/1) | Open, CI green |
-| 2 | Cleaning & validation | `feat/etl-cleaning` | [#2](https://github.com/SABOQuan/warming-cities/pull/2) | Open, stacked on #1 |
-| 2.5 | Statistics + analysis notebook | `feat/eda-modeling` | [#3](https://github.com/SABOQuan/warming-cities/pull/3) | Open, stacked on #2 |
-| 3 | SQLite aggregation + JSON export | `feat/aggregate-export` | [#4](https://github.com/SABOQuan/warming-cities/pull/4) | Open, stacked on #3 |
-| — | Project log | `docs/project-log` | [#5](https://github.com/SABOQuan/warming-cities/pull/5) | Stacked on #4 |
-| 4 | Frontend scaffold | `feat/frontend-scaffold` | [#6](https://github.com/SABOQuan/warming-cities/pull/6) | Stacked on #5 |
-| 5 | Core charts (SVG) | `feat/charts-core` | [#7](https://github.com/SABOQuan/warming-cities/pull/7) | Stacked on #6 |
-| 6 | Year range + comparison | `feat/interactivity` | [#8](https://github.com/SABOQuan/warming-cities/pull/8) | Stacked on #7 |
-| 7 | Y2K design pass | `feat/ui-theme` | [#9](https://github.com/SABOQuan/warming-cities/pull/9) | Stacked on #8 |
+| 1 | Data download (temperature + air quality) | `feat/data-download` | [#1](https://github.com/SABOQuan/warming-cities/pull/1) | Merged |
+| 2 | Cleaning & validation | `feat/etl-cleaning` | [#2](https://github.com/SABOQuan/warming-cities/pull/2) | Merged |
+| 2.5 | Statistics + analysis notebook | `feat/eda-modeling` | [#3](https://github.com/SABOQuan/warming-cities/pull/3) | Merged |
+| 3 | SQLite aggregation + JSON export | `feat/aggregate-export` | [#4](https://github.com/SABOQuan/warming-cities/pull/4) | Merged |
+| — | Project log | `docs/project-log` | [#5](https://github.com/SABOQuan/warming-cities/pull/5) | Merged |
+| 4 | Frontend scaffold | `feat/frontend-scaffold` | [#6](https://github.com/SABOQuan/warming-cities/pull/6) | Merged |
+| 5 | Core charts (SVG) | `feat/charts-core` | [#7](https://github.com/SABOQuan/warming-cities/pull/7) | Merged |
+| 6 | Year range + comparison | `feat/interactivity` | [#8](https://github.com/SABOQuan/warming-cities/pull/8) | Merged |
+| 7 | Y2K design pass | `feat/ui-theme` | [#9](https://github.com/SABOQuan/warming-cities/pull/9) | Merged |
 | 8 | Deployment | — | — | Not done: the site is a static build and can be hosted anywhere |
-| 9 | README, methodology, cleanup | `docs/final-readme` | — | Done |
+| 9 | README, methodology, cleanup | `docs/final-readme` | [#10](https://github.com/SABOQuan/warming-cities/pull/10) | Merged |
 
-The PRs are stacked: merge them in order (#1 → #2 → … → #9). CI runs only on PRs into `main`,
-so each later PR gets its CI run once the one before it is merged and GitHub retargets it.
+All PRs were stacked and merged into `main` in order (#1 → #10) on 2026-11-07, with CI green.
 
 **The project is complete.** The site is built (Phases 4–7) and documented in `README.md` and `METHODOLOGY.md`. The site's data is exported and committed in
 `web/public/data/` (one JSON per city plus a `cities.json` index, 186 KB). 79 automated tests
