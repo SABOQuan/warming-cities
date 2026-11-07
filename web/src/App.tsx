@@ -2,14 +2,18 @@ import { useState } from 'react';
 import { useCitiesIndex, useCity } from './data';
 import type { CitiesIndex, CityData } from './types';
 import { Pm25Chart, TemperatureChart } from './components/CityCharts';
+import { Compare } from './components/Compare';
 import { Stripes } from './components/Stripes';
+import { YearRange } from './components/YearRange';
 import { fmt } from './lib/format';
+import type { Domain } from './lib/scale';
 
-// Phase 5: functional charts; the visual design comes in Phase 7.
+// Phase 6: year-range filter and multi-city comparison; the visual design comes in Phase 7.
 
 function CityDetail({ city, guideline }: { city: CityData; guideline: number }) {
   const years = city.temperature.map((t) => t.year);
-  const range: [number, number] = [years[0], years[years.length - 1]];
+  const bounds: Domain = [years[0], years[years.length - 1]];
+  const [range, setRange] = useState<Domain>(bounds);
 
   const { stats } = city;
   const trend = stats.temperature_trend;
@@ -71,6 +75,7 @@ function CityDetail({ city, guideline }: { city: CityData; guideline: number }) 
       <Stripes temperature={city.temperature} label={`Warming stripes for ${city.name}`} />
 
       <h3>Annual temperature ({city.temperature.length} years)</h3>
+      <YearRange bounds={bounds} value={range} onChange={setRange} />
       <TemperatureChart city={city} range={range} />
       <details>
         <summary>View as table</summary>
@@ -129,11 +134,12 @@ function CityView({ id, guideline }: { id: string; guideline: number }) {
   const city = useCity(id);
   if (city.status === 'loading') return <p>Loading city…</p>;
   if (city.status === 'error') return <p role="alert">{city.error}</p>;
-  return <CityDetail city={city.data} guideline={guideline} />;
+  return <CityDetail key={city.data.id} city={city.data} guideline={guideline} />;
 }
 
 function Explorer({ index }: { index: CitiesIndex }) {
   const [selected, setSelected] = useState(index.cities[0]?.id ?? null);
+  const [compare, setCompare] = useState<string[]>(index.cities.slice(0, 2).map((c) => c.id));
   const { methodology } = index;
 
   return (
@@ -150,6 +156,9 @@ function Explorer({ index }: { index: CitiesIndex }) {
       </label>
 
       {selected && <CityView id={selected} guideline={methodology.who_pm25_guideline} />}
+
+      <h2>Compare cities</h2>
+      <Compare cities={index.cities} selected={compare} onChange={setCompare} />
 
       <footer>
         <p>{methodology.caveat}</p>
