@@ -53,6 +53,9 @@ MISSING_VALUE = -9999  # GHCN's sentinel for "no reading this month"
 MAX_STATION_DISTANCE_KM = 100  # sanity threshold — see find_best_station docstring
 RECENT_YEARS_CUTOFF = 5  # a station's most recent reading must be within this many years to
 # count as "reporting currently" — see find_best_station docstring
+BASELINE = (1961, 1990)  # anomaly reference period, per ROADMAP.md
+BASELINE_SEARCH_KM = 50  # how far out to look for a station with a better baseline record
+MIN_MONTHS_PER_YEAR = 10  # a baseline year only counts if it has at least this many months
 
 RAW_DIR = Path(__file__).parent / "data" / "raw" / "ghcn"
 ARCHIVE_PATH = RAW_DIR / "ghcnm.tavg.latest.qcf.tar.gz"
@@ -154,15 +157,47 @@ def scan_station_last_years(dat_path: Path) -> dict[str, int]:
     return last_year
 
 
+def scan_baseline_years(dat_path: Path) -> dict[str, int]:
+    """One pass over the .dat file counting, per station, the 1961-1990 years that have at least
+    MIN_MONTHS_PER_YEAR months of TAVG data.
+
+    Needed because "nearest current station" can still have a hollow baseline — found in Phase 2
+    for Delhi: Palam (15km, picked on proximity) only starts in 1997, so it has no 1961-1990 data
+    at all, while Safdarjung (16km) has all 30 years. Anomalies are measured against that
+    baseline, so find_best_station ranks on it before distance.
+    """
+    first, last = BASELINE
+    counts: dict[str, int] = {}
+    with dat_path.open(encoding="utf-8", errors="replace") as f:
+        for line in f:
+            if line[15:19] != "TAVG" or not first <= int(line[11:15]) <= last:
+                continue
+            months = 0
+            for month in range(12):
+                raw_value = line[19 + month * 8: 24 + month * 8].strip()
+                if raw_value and raw_value != str(MISSING_VALUE):
+                    months += 1
+            if months >= MIN_MONTHS_PER_YEAR:
+                station_id = line[0:11]
+                counts[station_id] = counts.get(station_id, 0) + 1
+    return counts
+
+
 def find_best_station(
-    stations: dict[str, dict], last_year: dict[str, int], lat: float, lon: float
+    stations: dict[str, dict],
+    last_year: dict[str, int],
+    lat: float,
+    lon: float,
+    baseline_years: dict[str, int] | None = None,
 ) -> tuple[str, float]:
     """Return (station_id, distance_km) of the best station to represent (lat, lon).
 
     "Best" means: prefer a station whose data reaches within RECENT_YEARS_CUTOFF of today (so the
-    city's series has an actual "current" figure, not one that goes dead years ago) — among those,
-    pick the nearest. If NO nearby station has recent data, fall back to the single nearest
-    station overall and log a warning, rather than silently returning a stale series.
+    city's series has an actual "current" figure, not one that goes dead years ago). Among those
+    within BASELINE_SEARCH_KM, pick the one with the most complete 1961-1990 baseline (see
+    scan_baseline_years), nearest first on ties; if none are that close, the nearest current one.
+    If NO station has recent data, fall back to the single nearest station overall and log a
+    warning, rather than silently returning a stale series.
 
     MAX_STATION_DISTANCE_KM is a separate sanity check: past that distance, even a "best" match
     may not represent the city's local climate well.
@@ -182,6 +217,10 @@ def find_best_station(
         )
 
     best_id = min(candidates, key=distance_to)
+    if baseline_years:
+        close = [sid for sid in candidates if distance_to(sid) <= BASELINE_SEARCH_KM]
+        if close:
+            best_id = min(close, key=lambda sid: (-baseline_years.get(sid, 0), distance_to(sid)))
     distance = distance_to(best_id)
     if distance > MAX_STATION_DISTANCE_KM:
         log.warning(
@@ -230,9 +269,11 @@ def download_city(
     last_year: dict[str, int],
     dat_path: Path,
     overwrite: bool = False,
+    baseline_years: dict[str, int] | None = None,
 ) -> None:
     """Match one city to its best station (see find_best_station) and write that station's series
-    to data/raw/ghcn/<city>.json — {"station_id", "station_name", "distance_km", "readings": [...]}.
+    to data/raw/ghcn/<city>.json — {"station_id", "station_name", "distance_km", "baseline_years",
+    "readings": [...]}.
 
     Resumable the same way download_air_quality.py is: an existing output file is trusted and
     skipped unless --overwrite is passed, since station matching + parsing the .dat file is the
@@ -243,8 +284,9 @@ def download_city(
         log.info("%s: already have %s — skipping", city, out_file)
         return
 
-    station_id, distance = find_best_station(stations, last_year, lat, lon)
+    station_id, distance = find_best_station(stations, last_year, lat, lon, baseline_years)
     station = stations[station_id]
+    baseline = (baseline_years or {}).get(station_id, 0)
     readings = parse_station_series(dat_path, station_id)
     if not readings:
         log.warning("%s: station %s (%s) has no TAVG readings", city, station_id, station["name"])
@@ -253,11 +295,12 @@ def download_city(
         "station_id": station_id,
         "station_name": station["name"],
         "distance_km": round(distance, 1),
+        "baseline_years": baseline,
         "readings": readings,
     }, indent=2))
     log.info(
-        "%s: station %s (%s), %.0fkm away — %d monthly readings -> %s",
-        city, station_id, station["name"], distance, len(readings), out_file,
+        "%s: station %s (%s), %.0fkm away, baseline %d/30 — %d monthly readings -> %s",
+        city, station_id, station["name"], distance, baseline, len(readings), out_file,
     )
 
 
@@ -268,6 +311,10 @@ def main() -> None:
         "--overwrite", action="store_true",
         help="Re-download the archive and redo station matching, even if already done.",
     )
+    parser.add_argument(
+        "--rematch", action="store_true",
+        help="Redo station matching from the archive already on disk (no download).",
+    )
     args = parser.parse_args()
 
     download_archive(args.overwrite)
@@ -275,10 +322,14 @@ def main() -> None:
     stations = parse_inventory(inv_path)
     log.info("loaded %d stations from inventory", len(stations))
     last_year = scan_station_last_years(dat_path)
+    baseline_years = scan_baseline_years(dat_path)
 
     cities = {args.city: CITIES[args.city]} if args.city else CITIES
     for city, (lat, lon) in cities.items():
-        download_city(city, lat, lon, stations, last_year, dat_path, args.overwrite)
+        download_city(
+            city, lat, lon, stations, last_year, dat_path,
+            overwrite=args.overwrite or args.rematch, baseline_years=baseline_years,
+        )
 
 
 if __name__ == "__main__":

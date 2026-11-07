@@ -104,6 +104,68 @@ def test_find_best_station_warns_past_sanity_threshold(caplog):
     assert "may not represent local climate" in caplog.text
 
 
+def test_find_best_station_prefers_baseline_coverage_over_proximity():
+    # Regression test for the real Delhi case: the nearest current station (PALAM) starts in
+    # 1997, so it has no 1961-1990 baseline; SAFDARJUNG, slightly further, has all 30 years.
+    stations = {
+        "PALAM": {"lat": 40.72, "lon": -74.00, "elevation_m": 0.0, "name": "Near, no baseline"},
+        "SAFDARJUNG": {"lat": 40.80, "lon": -74.05, "elevation_m": 0.0, "name": "Full baseline"},
+    }
+    current_year = dt.date.today().year
+    last_year = {"PALAM": current_year, "SAFDARJUNG": current_year}
+    baseline_years = {"SAFDARJUNG": 30}
+
+    station_id, _distance = dt.find_best_station(
+        stations, last_year, 40.7128, -74.0060, baseline_years
+    )
+
+    assert station_id == "SAFDARJUNG"
+
+
+def test_find_best_station_breaks_baseline_ties_by_distance():
+    stations = {
+        "NEAR": {"lat": 40.72, "lon": -74.00, "elevation_m": 0.0, "name": "Near"},
+        "FAR": {"lat": 40.90, "lon": -74.20, "elevation_m": 0.0, "name": "Far"},
+    }
+    current_year = dt.date.today().year
+    last_year = {"NEAR": current_year, "FAR": current_year}
+
+    station_id, _distance = dt.find_best_station(
+        stations, last_year, 40.7128, -74.0060, {"NEAR": 30, "FAR": 30}
+    )
+
+    assert station_id == "NEAR"
+
+
+def test_find_best_station_ignores_baseline_beyond_search_radius():
+    # A perfect baseline 100+km away shouldn't beat the city's own station.
+    stations = {
+        "CITY": {"lat": 40.72, "lon": -74.00, "elevation_m": 0.0, "name": "In the city"},
+        "DISTANT": {"lat": 42.00, "lon": -74.00, "elevation_m": 0.0, "name": "Upstate"},
+    }
+    current_year = dt.date.today().year
+    last_year = {"CITY": current_year, "DISTANT": current_year}
+
+    station_id, _distance = dt.find_best_station(
+        stations, last_year, 40.7128, -74.0060, {"CITY": 5, "DISTANT": 30}
+    )
+
+    assert station_id == "CITY"
+
+
+def test_scan_baseline_years_counts_only_full_baseline_years(tmp_path):
+    dat_path = tmp_path / "data.dat"
+    dat_path.write_text(
+        _dat_line("US000111111", 1960, [1.0] * 12)  # before the baseline
+        + _dat_line("US000111111", 1961, [1.0] * 12)
+        + _dat_line("US000111111", 1975, [1.0] * 9 + [None] * 3)  # only 9 months
+        + _dat_line("US000111111", 1990, [1.0] * 10 + [None] * 2)
+        + _dat_line("US000222222", 2000, [1.0] * 12)  # after the baseline
+    )
+
+    assert dt.scan_baseline_years(dat_path) == {"US000111111": 2}
+
+
 def test_scan_station_last_years(tmp_path):
     dat_path = tmp_path / "data.dat"
     dat_path.write_text(
