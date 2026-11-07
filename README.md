@@ -2,6 +2,8 @@
 
 How much hotter, and how much smoggier, have eleven of the world's big cities become?
 
+**Live site: <https://warming-cities.vercel.app>**
+
 Warming Cities is a climate data project in two halves. A tested **Python pipeline** downloads
 up to 180 years of station temperature records (NOAA GHCN) and a decade of PM2.5 air-quality
 readings (OpenAQ), cleans and validates them, aggregates them in SQLite and fits the statistics.
@@ -39,7 +41,8 @@ The full results table is in [`PROJECT_LOG.md`](./PROJECT_LOG.md#4-results).
 | **Methods** (`#/methods`) | How every number is made, in plain language |
 
 The charts are hand-drawn SVG, with no chart library. The site uses hash routes, so the static
-build works on any host without server rewrites.
+build works on any host without server rewrites. It is hosted on Vercel, which builds `web/`
+(Vite) with Node 22.
 
 ---
 
