@@ -2,7 +2,7 @@
 
 Python pipeline: raw data in, cleaned + modeled JSON out for the frontend to consume.
 
-Modules to be added phase by phase (see `../ROADMAP.md`):
+Modules, in pipeline order (methodology in `../METHODOLOGY.md`):
 
 - `cities.py` — the locked list of 11 cities (name -> lat/lon), shared by every download script.
 - `download_air_quality.py` — Phase 1. Pull monthly PM2.5 aggregates per station from the OpenAQ
@@ -10,8 +10,6 @@ Modules to be added phase by phase (see `../ROADMAP.md`):
   1,000/hour, tracked across runs). Run `--city lahore` first to confirm the key works.
 - `download_temperature.py` — Phase 1. Pull monthly temperature history per city from NOAA
   GHCN-Monthly into `data/raw/ghcn/`.
-- `download_sea_level.py` — deferred to v2. Local sea-level change mixes land subsidence and
-  global rise, which is out of scope for this version.
 - `clean.py` — Phase 2 (`python clean.py`). Season-adjusted annual temperature and PM2.5 per
   city in `data/processed/`, plus `quality_report.json` (coverage, baseline, dropped months).
   Drops PM2.5 months with < 75% coverage or error-code spikes. Methodology is in its docstring.
