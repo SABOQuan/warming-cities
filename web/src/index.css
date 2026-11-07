@@ -3,3 +3,66 @@ body {
   font-family: system-ui, sans-serif;
   margin: 1rem;
 }
+
+/* Phase 5: just enough for the charts to be legible. */
+.chart {
+  position: relative;
+  max-width: 60rem;
+}
+.chart svg {
+  display: block;
+  font:
+    11px system-ui,
+    sans-serif;
+}
+.chart-grid line {
+  stroke: #e3e3e3;
+}
+.chart-grid text,
+.chart-axis text {
+  fill: #666;
+}
+.chart-zero {
+  stroke: #888;
+}
+.chart-line {
+  fill: none;
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+.chart-ref line {
+  stroke: #111;
+  stroke-dasharray: 4 3;
+}
+.chart-ref text {
+  fill: #111;
+}
+.chart-hover line {
+  stroke: #111;
+}
+.chart-hover circle {
+  stroke: #fff;
+  stroke-width: 2;
+}
+.chart-tip {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 8px;
+  background: rgba(0, 0, 0, 0.8);
+  color: #fff;
+  font:
+    12px system-ui,
+    sans-serif;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.tip-muted {
+  opacity: 0.7;
+}
+.stripes {
+  display: block;
+  width: 100%;
+  max-width: 60rem;
+}

@@ -1,14 +1,16 @@
 import { useState } from 'react';
 import { useCitiesIndex, useCity } from './data';
 import type { CitiesIndex, CityData } from './types';
+import { Pm25Chart, TemperatureChart } from './components/CityCharts';
+import { Stripes } from './components/Stripes';
+import { fmt } from './lib/format';
 
-// Phase 4: unstyled on purpose. This proves the pipeline -> JSON -> app wiring
-// end to end; charts come in Phase 5 and the visual design in Phase 7.
+// Phase 5: functional charts; the visual design comes in Phase 7.
 
-const fmt = (v: number | null | undefined, digits = 2) =>
-  v === null || v === undefined ? '—' : v.toFixed(digits);
+function CityDetail({ city, guideline }: { city: CityData; guideline: number }) {
+  const years = city.temperature.map((t) => t.year);
+  const range: [number, number] = [years[0], years[years.length - 1]];
 
-function CityDetail({ city }: { city: CityData }) {
   const { stats } = city;
   const trend = stats.temperature_trend;
   const pm = stats.pm25_trend;
@@ -66,58 +68,68 @@ function CityDetail({ city }: { city: CityData }) {
         ))}
       </ol>
 
+      <Stripes temperature={city.temperature} label={`Warming stripes for ${city.name}`} />
+
       <h3>Annual temperature ({city.temperature.length} years)</h3>
-      <table>
-        <thead>
-          <tr>
-            <th>Year</th>
-            <th>Mean °C</th>
-            <th>Anomaly °C</th>
-            <th>10-yr rolling °C</th>
-          </tr>
-        </thead>
-        <tbody>
-          {city.temperature.map((t) => (
-            <tr key={t.year}>
-              <td>{t.year}</td>
-              <td>{fmt(t.temp_c)}</td>
-              <td>{fmt(t.anomaly_c)}</td>
-              <td>{fmt(t.rolling_c)}</td>
+      <TemperatureChart city={city} range={range} />
+      <details>
+        <summary>View as table</summary>
+        <table>
+          <thead>
+            <tr>
+              <th>Year</th>
+              <th>Mean °C</th>
+              <th>Anomaly °C</th>
+              <th>10-yr mean anomaly °C</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {city.temperature.map((t) => (
+              <tr key={t.year}>
+                <td>{t.year}</td>
+                <td>{fmt(t.temp_c)}</td>
+                <td>{fmt(t.anomaly_c)}</td>
+                <td>{fmt(t.rolling_c)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </details>
 
       <h3>Annual PM2.5 ({city.air_quality.length} years)</h3>
-      <table>
-        <thead>
-          <tr>
-            <th>Year</th>
-            <th>PM2.5 µg/m³</th>
-            <th>× WHO guideline</th>
-            <th>Monitors</th>
-          </tr>
-        </thead>
-        <tbody>
-          {city.air_quality.map((a) => (
-            <tr key={a.year}>
-              <td>{a.year}</td>
-              <td>{fmt(a.pm25, 1)}</td>
-              <td>{fmt(a.who_multiple, 1)}</td>
-              <td>{a.n_locations}</td>
+      <Pm25Chart city={city} guideline={guideline} />
+      <details>
+        <summary>View as table</summary>
+        <table>
+          <thead>
+            <tr>
+              <th>Year</th>
+              <th>PM2.5 µg/m³</th>
+              <th>× WHO guideline</th>
+              <th>Monitors</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {city.air_quality.map((a) => (
+              <tr key={a.year}>
+                <td>{a.year}</td>
+                <td>{fmt(a.pm25, 1)}</td>
+                <td>{fmt(a.who_multiple, 1)}</td>
+                <td>{a.n_locations}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </details>
     </article>
   );
 }
 
-function CityView({ id }: { id: string }) {
+function CityView({ id, guideline }: { id: string; guideline: number }) {
   const city = useCity(id);
   if (city.status === 'loading') return <p>Loading city…</p>;
   if (city.status === 'error') return <p role="alert">{city.error}</p>;
-  return <CityDetail city={city.data} />;
+  return <CityDetail city={city.data} guideline={guideline} />;
 }
 
 function Explorer({ index }: { index: CitiesIndex }) {
@@ -137,7 +149,7 @@ function Explorer({ index }: { index: CitiesIndex }) {
         </select>
       </label>
 
-      {selected && <CityView id={selected} />}
+      {selected && <CityView id={selected} guideline={methodology.who_pm25_guideline} />}
 
       <footer>
         <p>{methodology.caveat}</p>
