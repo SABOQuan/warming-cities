@@ -1,32 +1,35 @@
-# React + TypeScript + Vite
+# web/
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+The Warming Cities site: React 19 + TypeScript + Vite, with no runtime dependencies beyond
+React. It reads the JSON that `etl/export.py` writes to `public/data/`.
 
-Currently, two official plugins are available:
-
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+npm install
+npm run dev          # dev server
+npm run build        # type-check + static build in dist/
+npm run lint         # oxlint
+npm run typecheck
+npm run format       # prettier
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+## Structure
+
+```
+src/
+  main.tsx, App.tsx       entry point; header, nav and page switch
+  router.ts               hash routes: #/, #/city/<id>, #/compare?c=a,b, #/methods
+  data.ts, types.ts       typed loader for cities.json and <city>.json
+  pages/                  Home (catalogue), City, Methods
+  components/
+    Chart.tsx             generic SVG line/bar chart with axes and tooltips
+    CityCharts.tsx        temperature anomaly + PM2.5 charts for one city
+    Stripes.tsx           warming stripes
+    Compare.tsx           up to three cities' anomalies on one chart
+    YearRange.tsx         year-range filter
+    Fuzzy.tsx             display type blurred by an SVG turbulence filter that sharpens on hover
+  lib/                    scales, colours (RdBu diverging + categorical), formatting, catalogue helpers
+  index.css               the whole theme
+```
+
+Charts are drawn by hand in SVG instead of using a chart library, which keeps the bundle small
+and gives full control over the look.
