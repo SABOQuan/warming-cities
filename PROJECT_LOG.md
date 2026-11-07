@@ -3,7 +3,7 @@
 What has been built so far, the decisions behind it, what went wrong and how it was fixed, and
 every source the project relies on. `ROADMAP.md` is the plan; this file is the record.
 
-*Last updated: 2026-10-27.*
+*Last updated: 2026-11-07.*
 
 ---
 
@@ -16,14 +16,18 @@ every source the project relies on. `ROADMAP.md` is the plan; this file is the r
 | 2 | Cleaning & validation | `feat/etl-cleaning` | [#2](https://github.com/SABOQuan/warming-cities/pull/2) | Open, stacked on #1 |
 | 2.5 | Statistics + analysis notebook | `feat/eda-modeling` | [#3](https://github.com/SABOQuan/warming-cities/pull/3) | Open, stacked on #2 |
 | 3 | SQLite aggregation + JSON export | `feat/aggregate-export` | [#4](https://github.com/SABOQuan/warming-cities/pull/4) | Open, stacked on #3 |
-| 4–7 | Frontend (scaffold, charts, interactivity, Y2K design) | — | — | Not started |
-| 8 | Deployment | — | — | Not started |
-| 9 | Final README / write-up | — | — | Not started |
+| — | Project log | `docs/project-log` | [#5](https://github.com/SABOQuan/warming-cities/pull/5) | Stacked on #4 |
+| 4 | Frontend scaffold | `feat/frontend-scaffold` | [#6](https://github.com/SABOQuan/warming-cities/pull/6) | Stacked on #5 |
+| 5 | Core charts (SVG) | `feat/charts-core` | [#7](https://github.com/SABOQuan/warming-cities/pull/7) | Stacked on #6 |
+| 6 | Year range + comparison | `feat/interactivity` | [#8](https://github.com/SABOQuan/warming-cities/pull/8) | Stacked on #7 |
+| 7 | Y2K design pass | `feat/ui-theme` | [#9](https://github.com/SABOQuan/warming-cities/pull/9) | Stacked on #8 |
+| 8 | Deployment | — | — | Not done: the site is a static build and can be hosted anywhere |
+| 9 | README, methodology, cleanup | `docs/final-readme` | — | Done |
 
-The PRs are stacked: merge them in order (#1 → #2 → #3 → #4). CI runs only on PRs into `main`,
+The PRs are stacked: merge them in order (#1 → #2 → … → #9). CI runs only on PRs into `main`,
 so each later PR gets its CI run once the one before it is merged and GitHub retargets it.
 
-**The data side of the project is complete.** The site's data is exported and committed in
+**The project is complete.** The site is built (Phases 4–7) and documented in `README.md` and `METHODOLOGY.md`. The site's data is exported and committed in
 `web/public/data/` (one JSON per city plus a `cities.json` index, 186 KB). 79 automated tests
 pass.
 
@@ -186,7 +190,7 @@ python clean.py && python analysis.py && python export.py
 
 ### Software
 - Python: pandas, NumPy, SciPy (`linregress`, `pearsonr`), requests, python-dotenv, SQLite (standard library), matplotlib and Jupyter (notebook only), pytest and ruff.
-- Frontend (planned): React, TypeScript, Vite.
+- Frontend: React 19, TypeScript, Vite; hand-drawn SVG charts (no chart library); oxlint and Prettier.
 
 ### Inspiration
 - **ssorkin/climate**, <https://github.com/ssorkin/climate>: a mature NOAA-station climate explorer for Los Angeles. Ideas worth adopting are tracked in our planning (data-quality report, known-issues registry, analysis config, stat tiles and warming stripes on the site).
