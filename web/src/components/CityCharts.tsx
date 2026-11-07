@@ -62,7 +62,7 @@ export function Pm25Chart({ city, guideline }: { city: CityData; guideline: numb
       label={`${city.name}: annual mean PM2.5 against the WHO guideline of ${guideline} µg/m³`}
       xDomain={[aq[0].year, aq[aq.length - 1].year]}
       bars={aq.map((a) => ({ x: a.year, y: a.pm25, color: PM_FILL }))}
-      refLines={[{ y: guideline, label: `WHO guideline ${guideline} µg/m³` }]}
+      refLines={[{ y: guideline, label: 'WHO guideline' }]}
       yFormat={(v) => String(v)}
       height={220}
       tooltip={(year) => {

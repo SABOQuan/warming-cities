@@ -66,6 +66,16 @@ function linePath(points: Point[], x: (v: number) => number, y: (v: number) => n
   return d;
 }
 
+/** Push end-of-line labels apart vertically so close lines don't print on top of each other. */
+function spreadLabels<T extends { py: number }>(labels: T[], minGap = 14): T[] {
+  const sorted = [...labels].sort((a, b) => a.py - b.py);
+  for (let i = 1; i < sorted.length; i++) {
+    if (sorted[i].py - sorted[i - 1].py < minGap)
+      sorted[i] = { ...sorted[i], py: sorted[i - 1].py + minGap };
+  }
+  return sorted;
+}
+
 export function Chart({
   label,
   xDomain,
@@ -93,13 +103,16 @@ export function Chart({
   ];
   const { domain: yDomain, ticks } = niceTicks(Math.min(...values), Math.max(...values), 5);
 
-  const m = { top: 10, right: directLabels ? 96 : 12, bottom: 24, left: 44 };
+  // Right margin holds direct labels or reference-line labels, so they never sit on the data.
+  const right = directLabels ? 96 : refLines.length > 0 ? 92 : 12;
+  const m = { top: 10, right, bottom: 24, left: 44 };
   const plotW = Math.max(40, width - m.left - m.right);
   const plotH = height - m.top - m.bottom;
   const band = plotW / (x1 - x0 + 1);
   const x = (year: number) => m.left + (year - x0 + 0.5) * band;
   const y = linear(yDomain, [m.top + plotH, m.top]);
   const gap = band > 4 ? 1 : 0;
+  const barW = Math.min(28, Math.max(0.5, band - gap));
 
   const yearAt = (px: number) =>
     Math.max(x0, Math.min(x1, Math.round(x0 + (px - m.left) / band - 0.5)));
@@ -154,8 +167,8 @@ export function Chart({
           return (
             <rect
               key={b.x}
-              x={x(b.x) - band / 2 + gap / 2}
-              width={Math.max(0.5, band - gap)}
+              x={x(b.x) - barW / 2}
+              width={barW}
               y={top}
               height={Math.max(0.5, Math.abs(y(b.y) - y(0)))}
               fill={b.color}
@@ -167,7 +180,7 @@ export function Chart({
         {refLines.map((r) => (
           <g key={r.label} className="chart-ref">
             <line x1={m.left} x2={m.left + plotW} y1={y(r.y)} y2={y(r.y)} />
-            <text x={m.left + plotW - 4} y={y(r.y) - 5} textAnchor="end">
+            <text x={m.left + plotW + 6} y={y(r.y)} dy="0.32em">
               {r.label}
             </text>
           </g>
@@ -178,21 +191,16 @@ export function Chart({
         ))}
 
         {directLabels &&
-          visibleLines.map((l) => {
-            const last = [...l.points].reverse().find((p) => p.y !== null);
-            if (!last || last.y === null) return null;
-            return (
-              <text
-                key={l.id}
-                x={x(last.x) + 8}
-                y={y(last.y)}
-                dy="0.32em"
-                className="chart-direct-label"
-              >
-                <tspan fill={l.color}>●</tspan> {l.label}
-              </text>
-            );
-          })}
+          spreadLabels(
+            visibleLines.flatMap((l) => {
+              const last = [...l.points].reverse().find((p) => p.y !== null);
+              return last && last.y !== null ? [{ line: l, px: x(last.x), py: y(last.y) }] : [];
+            }),
+          ).map(({ line, px, py }) => (
+            <text key={line.id} x={px + 8} y={py} dy="0.32em" className="chart-direct-label">
+              <tspan fill={line.color}>●</tspan> {line.label}
+            </text>
+          ))}
 
         {hover !== null && (
           <g className="chart-hover">
