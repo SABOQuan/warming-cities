@@ -15,11 +15,11 @@ Modules to be added phase by phase (see `../ROADMAP.md`):
 - `clean.py` — Phase 2 (`python clean.py`). Season-adjusted annual temperature and PM2.5 per
   city in `data/processed/`, plus `quality_report.json` (coverage, baseline, dropped months).
   Drops PM2.5 months with < 75% coverage or error-code spikes. Methodology is in its docstring.
-  Originally planned as: parse, validate, and normalize each raw dataset into a common annual
-  granularity per city.
-- `notebooks/exploratory_analysis.ipynb` — Phase 2.5. Trend regression, rolling averages,
-  temperature-vs-air-quality correlation analysis (with the causation caveat documented in
-  `../ROADMAP.md`), written findings.
+- `analysis.py` — Phase 2.5 (`python analysis.py`). Warming trend since 1970 (°C/decade, 95%
+  CI), anomalies vs 1961-1990, rolling means, PM2.5 trends, and the raw + detrended
+  temperature-vs-PM2.5 correlation. Writes `data/processed/analysis_summary.json` for export.
+- `notebooks/exploratory_analysis.ipynb` — Phase 2.5. Charts, findings, and the methodology and
+  caveats, built on `analysis.py`. Needs `pip install -r requirements-notebook.txt`.
 - `aggregate.py` — Phase 3. Load cleaned data into SQLite, run the SQL aggregation queries
   (annual mean, anomaly vs. 1961-1990 baseline, extreme-heat-day counts).
 - `export.py` — Phase 3. Write the final per-city JSON to `../web/public/data/`.
